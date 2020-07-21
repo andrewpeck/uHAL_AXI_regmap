@@ -27,7 +27,7 @@ class tree(object):
     def generateYaml(self, baseName, current_node, members, description):
         with open(self.outFileName.replace(".vhd",".yml"),'a') as outFile:
             ##### Generate and print a VHDL record
-            outFile.write(baseName+":\n")
+            outFile.write("- " + baseName+":\n")
             maxNameLength = 25
             maxTypeLength = 12
             sorted_members = sorted(members.items(), key=lambda item: (current_node.getChild(item[0]).address<<32) + current_node.getChild(item[0]).mask)
@@ -202,6 +202,8 @@ class tree(object):
             outFile.write("    packages:\n")
             outFile.write("    shared_lib:\n")
             outFile.write("        - common_ieee_pkg\n")
+            outFile.write("\n")
+            outFile.write("HDL_Types:\n")
             outFile.write("\n")
             outFile.close()
 
