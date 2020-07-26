@@ -32,7 +32,7 @@ class tree(object):
             maxTypeLength = 12
             sorted_members = sorted(members.items(), key=lambda item: (current_node.getChild(item[0]).address<<32) + current_node.getChild(item[0]).mask)
             for memberName,member in sorted_members:
-                outFile.write("  - " + memberName + " : { type: ")
+                outFile.write("  - " + memberName + " : [ type: ")
                 member_type = re.sub("\(.*\\)", "", member.replace("std_logic_vector","logic").replace("std_logic","logic"))
                 outFile.write(member_type)
                 if ("downto" in member):
@@ -41,7 +41,7 @@ class tree(object):
                     outFile.write(", length: "+str(length))
                 if len(description[memberName]) > 0:
                     outFile.write(", description:" + description[memberName])
-                outFile.write(" }\n")
+                outFile.write(" ]\n")
             if current_node.isArray():
                 array_index_string = " is array(" + str(min(current_node.entries.keys())) + " to " + str(max(current_node.entries.keys()))+") of "
                 outFile.write("  type " + baseName + "_ARRAY" + array_index_string + baseName + ";")
