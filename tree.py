@@ -43,8 +43,9 @@ class tree(object):
                     outFile.write(", description:" + description[memberName])
                 outFile.write(" ]\n")
             if current_node.isArray():
-                array_index_string = " is array(" + str(min(current_node.entries.keys())) + " to " + str(max(current_node.entries.keys()))+") of "
-                outFile.write("  type " + baseName + "_ARRAY" + array_index_string + baseName + ";")
+                array_index_string = "array: " + str(max(current_node.entries.keys()))+", type: "
+                #array_index_string = "array: (" + str(min(current_node.entries.keys())) + " to " + str(max(current_node.entries.keys()))+"), type : "
+                outFile.write("\n- " + baseName + "_ARRAY: [" + array_index_string + baseName + "]")
             outFile.write("\n\n")
             outFile.close()
         return
