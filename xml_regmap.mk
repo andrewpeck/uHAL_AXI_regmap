@@ -15,7 +15,9 @@ clean_regmap:
 	@rm -rf $(MAP_OBJS) $(PKG_OBJS)
 
 xml_regmap : $(MAP_OBJS)
-# need to extract dir name and path name here
+	@rm ../registers/*.xml
+	@find ../address_tables/ -name *.xml -exec ln -s {} ../registers/ \;
+	@# need to extract dir name and path name here
 
 %_map.vhd %_PKG.vhd : %.xml
 	@cd $(dir $<) &&\
