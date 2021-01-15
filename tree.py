@@ -142,7 +142,7 @@ class tree(object):
                         intValue = int(child.parameters["default"],0)
                         if bits.find("downto") > 0:
                             if bitCount % 4 == 0:
-                                package_ctrl_entry_defaults[child.id] = "x\"" + hex(intValue)[2:].zfill(bitCount/4) + "\""
+                                package_ctrl_entry_defaults[child.id] = "x\"" + hex(intValue)[2:].zfill(int(bitCount/4)) + "\""
                             else:
                                 package_ctrl_entry_defaults[child.id] = "\"" + bin(intValue)[2:].zfill(bitCount) + "\""
                         else:
