@@ -11,12 +11,7 @@ PKG_OBJS = $(patsubst %.xml, %_PKG.vhd, $(SYM_LNK_XMLS))
 
 .PHONY: xml_regmap clean_regmap
 
-clean_regmap:
-	@rm -rf $(MAP_OBJS) $(PKG_OBJS)
-
 xml_regmap : $(MAP_OBJS)
-	@rm ../registers/*.xml
-	@find ../address_tables/ -name *.xml -exec ln -s {} ../registers/ \;
 	@# need to extract dir name and path name here
 
 %_map.vhd %_PKG.vhd : %.xml
@@ -25,3 +20,5 @@ xml_regmap : $(MAP_OBJS)
 	$(XML2VHD_PATH)/build_vhdl_packages test.xml &&\
 	rm test.xml
 
+clean_regmap:
+	@rm -f $(MAP_OBJS) $(PKG_OBJS)
