@@ -20,6 +20,8 @@ entity {{baseName}}_wb_interface is
     );
 end entity {{baseName}}_wb_interface;
 architecture behavioral of {{baseName}}_wb_interface is
+  signal strobe_r : std_logic := '0';
+  signal strobe_pulse : std_logic := '0';
   type slv32_array_t  is array (integer range <>) of std_logic_vector( 31 downto 0);
   signal localRdData : std_logic_vector (31 downto 0) := (others => '0');
   signal localWrData : std_logic_vector (31 downto 0) := (others => '0');
@@ -29,6 +31,15 @@ begin  -- architecture behavioral
 
   wb_rdata <= localRdData;
   localWrData <= wb_wdata;
+
+  strobe_pulse <= '1' when (strobe='1' and strobe_r='0') else '0';
+  process (clk) is
+  begin
+    if (rising_edge(clk)) then
+      strobe_r <= strobe;
+    end if;
+  end process;
+
 
   -- acknowledge
   process (clk) is
@@ -68,10 +79,11 @@ begin  -- architecture behavioral
   begin  -- process reg_writes
     if (rising_edge(clk)) then  -- rising clock edge
 
+      -- action resets
 {{a_ops_output}}
 
       -- Write on strobe=write=1
-      if wb_strobe='1' and wb_write = '1' then
+      if strobe_pulse='1' and wb_write = '1' then
         case to_integer(unsigned(wb_addr({{regAddrRange}} downto 0))) is
 {{w_ops_output}}
         when others => null;
