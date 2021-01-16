@@ -32,11 +32,11 @@ begin  -- architecture behavioral
   wb_rdata <= localRdData;
   localWrData <= wb_wdata;
 
-  strobe_pulse <= '1' when (strobe='1' and strobe_r='0') else '0';
+  strobe_pulse <= '1' when (wb_strobe='1' and strobe_r='0') else '0';
   process (clk) is
   begin
     if (rising_edge(clk)) then
-      strobe_r <= strobe;
+      strobe_r <= wb_strobe;
     end if;
   end process;
 
