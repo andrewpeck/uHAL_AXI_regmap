@@ -1,6 +1,6 @@
+from __future__ import unicode_literals
 from node import *
 from jinja2 import Template
-import re
 
 
 class tree(object):
@@ -23,32 +23,6 @@ class tree(object):
             uhal.setLogLevelTo(uhal.LogLevel.WARNING)
         ##### read the root node
         self.root = node(root,baseAddress=0,tree=self)
-
-    def generateYaml(self, baseName, current_node, members, description):
-        with open(self.outFileName.replace(".vhd",".yml"),'a') as outFile:
-            ##### Generate and print a VHDL record
-            outFile.write("- " + baseName+":\n")
-            maxNameLength = 25
-            maxTypeLength = 12
-            sorted_members = sorted(members.items(), key=lambda item: (current_node.getChild(item[0]).address<<32) + current_node.getChild(item[0]).mask)
-            for memberName,member in sorted_members:
-                outFile.write("  - " + memberName + " : [ type: ")
-                member_type = re.sub("\(.*\\)", "", member.replace("std_logic_vector","logic").replace("std_logic","logic"))
-                outFile.write(member_type)
-                if ("downto" in member):
-                    (high,low) = re.search(r'\((.*?)\)',member).group(1).replace("downto"," ").split()
-                    length = int(high)-int(low)+1
-                    outFile.write(", length: "+str(length))
-                if len(description[memberName]) > 0:
-                    outFile.write(", description:" + description[memberName])
-                outFile.write(" ]\n")
-            if current_node.isArray():
-                array_index_string = "array: " + str(max(current_node.entries.keys()))+", type: "
-                #array_index_string = "array: (" + str(min(current_node.entries.keys())) + " to " + str(max(current_node.entries.keys()))+"), type : "
-                outFile.write("\n- " + baseName + "_ARRAY: [" + array_index_string + baseName + "]")
-            outFile.write("\n\n")
-            outFile.close()
-        return
 
     def generateRecord(self, baseName, current_node, members, description):
         with open(self.outFileName,'a') as outFile:
@@ -129,7 +103,7 @@ class tree(object):
                 if bitCount == 1:
                     package_entries += "std_logic"
                 else:
-                    package_entries += "std_logic_vector(" + str(bitCount-1).rjust(2,' ') + " downto 0)"
+                    package_entries += "std_logic_vector(" + str(bitCount-1).rjust(2,str(' ')) + " downto 0)"
                 
                 package_description[child.id] = child.description
                 bits = child.getBitRange()
@@ -165,12 +139,10 @@ class tree(object):
             baseName = current_node.getPath(expandArray=False).replace('.','_')+'_MON_t'
             #print(padding+baseName)
             ret['mon'] = self.generateRecord(baseName, current_node, package_mon_entries, package_description)
-            self.generateYaml(baseName, current_node, package_mon_entries, package_description)
         if package_ctrl_entries:
             baseName = current_node.getPath(expandArray=False).replace('.','_')+'_CTRL_t'
             #print(padding+baseName)
             ret['ctrl'] = self.generateRecord(baseName, current_node, package_ctrl_entries, package_description)
-            self.generateYaml(baseName, current_node, package_ctrl_entries, package_description)
             ret["ctrl_default"] = self.generateDefaultRecord(baseName, package_ctrl_entry_defaults)
         return ret
 
@@ -180,7 +152,6 @@ class tree(object):
         self.write_ops = dict(list())
         self.action_ops = str()
         outFileBase = self.root.id
-
         self.outFileName = outFileName
         if not self.outFileName:
             self.outFileName = outFileBase + "_PKG.vhd"
@@ -191,23 +162,6 @@ class tree(object):
             outFile.write("use IEEE.std_logic_1164.all;\n")
             outFile.write("\n\npackage "+outFileBase+"_CTRL is\n")
             outFile.close()
-
-        self.outFileName = outFileName
-        if not self.outFileName:
-            self.outFileName = outFileBase + "_PKG.vhd"
-        with open(self.outFileName.replace(".vhd",".yml"), 'w') as outFile:
-            outFile.write("# This file was auto-generated.\n")
-            outFile.write("# Modifications might be lost.\n")
-            outFile.write("__config__:\n")
-            outFile.write("    basic_convert_functions : off\n")
-            outFile.write("    packages:\n")
-            outFile.write("    shared_lib:\n")
-            outFile.write("        - common_ieee_pkg\n")
-            outFile.write("\n")
-            outFile.write("HDL_Types:\n")
-            outFile.write("\n")
-            outFile.close()
-
         records = self.traversePkg()
         with open(self.outFileName, 'a') as outFile:
             outFile.write("\n\nend package "+outFileBase+"_CTRL;")
