@@ -3,6 +3,8 @@ from node import *
 from jinja2 import Template
 import re
 
+import datetime
+
 
 class tree(object):
     def __init__(self, root, logger=None, debug=False):
@@ -12,6 +14,10 @@ class tree(object):
         self.action_ops = str()
         self.default_ops = str()
         self.debug=debug
+        ##### package write selection
+        self.vhdl = 0           # write vhdl types package
+        self.vhdl_def = 1       # write vhdl defaults package
+        self.yml2hdl = 2        # version of yml2hdl tool type yml output 0=disable yml output
         ##### setup logger
         self.log = logger
         if not self.log:
@@ -24,11 +30,12 @@ class tree(object):
             uhal.setLogLevelTo(uhal.LogLevel.WARNING)
         ##### read the root node
         self.root = node(root,baseAddress=0,tree=self)
+        
     ####
-    # YML
+    # YML2HDL v1
     ####
     def generateYaml(self, baseName, current_node, members, description):
-            with open(self.outFileName.replace("PKG.vhd","TYPES.yml"),'a') as outFile:
+            with open(self.outFileName.replace("PKG.vhd","PKG.yml"),'a') as outFile:
                 ##### Generate and print a VHDL record
                 outFile.write("- " + baseName+":\n")
                 maxNameLength = 25
@@ -53,8 +60,40 @@ class tree(object):
                 outFile.close()
             return
     ####
-    # YML
+    # YML2HDL v1
     ####
+    ####
+    # YML2HDL v2
+    ####
+    def generateYamlv2(self, baseName, current_node, members, description):
+      with open(self.outFileName.replace("PKG.vhd","PKG.yml"),'a') as outFile:
+        ##### Generate and print a VHDL record
+        outFile.write("- " + baseName+":\n")
+        maxNameLength = 25
+        maxTypeLength = 12
+        sorted_members = sorted(members.items(), key=lambda item: (current_node.getChild(item[0]).address<<32) + current_node.getChild(item[0]).mask)
+        for memberName,member in sorted_members:
+          outFile.write("  - " + memberName + " : [ type: ")
+          member_type = re.sub("\(.*\\)", "", member.replace("std_logic_vector","logic").replace("std_logic","logic"))
+          outFile.write(member_type)
+          if ("downto" in member):
+              (high,low) = re.search(r'\((.*?)\)',member).group(1).replace("downto"," ").split()
+              length = int(high)-int(low)+1
+              outFile.write(", length: "+str(length))
+          # if len(description[memberName]) > 0:
+          #     outFile.write(", description: " + description[memberName])
+          outFile.write(" ]\n")
+        if current_node.isArray():
+            array_index_string = "array: " + str(max(current_node.entries.keys()))+", type: "
+            #array_index_string = "array: (" + str(min(current_node.entries.keys())) + " to " + str(max(current_node.entries.keys()))+"), type : "
+            outFile.write("\n- " + baseName + "_ARRAY: [" + array_index_string + baseName + "]")
+        outFile.write("\n\n")
+        outFile.close()
+        return
+    ####
+    # YML2HDL v2
+    ####
+
     def generateRecord(self, baseName, current_node, members, description):
         with open(self.outFileName,'a') as outFile:
             ##### Generate and print a VHDL record
@@ -171,22 +210,40 @@ class tree(object):
             #print(padding+baseName)
             ret['mon'] = self.generateRecord(baseName, current_node, package_mon_entries, package_description)
             ####
-            # YML
+            # YML2HDL v1
             ####
-            self.generateYaml(baseName, current_node, package_mon_entries, package_description)
+            if self.yml2hdl == 1:
+              self.generateYaml(baseName, current_node, package_mon_entries, package_description)
             ####
-            # YML
+            # YML2HDL v1
+            ####
+            ####
+            # YML2HDL v2
+            ####
+            if self.yml2hdl == 2:
+              self.generateYamlv2(baseName, current_node, package_mon_entries, package_description)
+            ####
+            # YML2HDL v2
             ####
         if package_ctrl_entries:
             baseName = current_node.getPath(expandArray=False).replace('.','_')+'_CTRL_t'
             #print(padding+baseName)
             ret['ctrl'] = self.generateRecord(baseName, current_node, package_ctrl_entries, package_description)
             ####
-            # YML
+            # YML2HDL v1
             ####
-            self.generateYaml(baseName, current_node, package_ctrl_entries, package_description)
+            if self.yml2hdl == 1:
+              self.generateYaml(baseName, current_node, package_ctrl_entries, package_description)
             ####
-            # YML
+            # YML2HDL v1
+            ####
+            ####
+            # YML2HDL v2
+            ####
+            if self.yml2hdl == 2:
+              self.generateYamlv2(baseName, current_node, package_ctrl_entries, package_description)
+            ####
+            # YML2HDL v2
             ####
             ret["ctrl_default"] = self.generateDefaultRecord(baseName, package_ctrl_entry_defaults)
         return ret
@@ -198,40 +255,90 @@ class tree(object):
         self.action_ops = str()
         outFileBase = self.root.id
         self.outFileName = outFileName
-        if not self.outFileName:
-            self.outFileName = outFileBase + "_PKG.vhd"
-        print("generatePkg : " + str(self.outFileName))
-        with open(self.outFileName, 'w') as outFile:
-            outFile.write("--This file was auto-generated.\n")
-            outFile.write("--Modifications might be lost.\n")
-            outFile.write("library IEEE;\n")
-            outFile.write("use IEEE.std_logic_1164.all;\n")
-            outFile.write("\n\npackage "+outFileBase+"_CTRL is\n")
-            outFile.close()
+        if self.vhdl:
+          if not self.outFileName:
+              self.outFileName = outFileBase + "_PKG.vhd"
+          print("generatePkg : " + str(self.outFileName))
+          with open(self.outFileName, 'w') as outFile:
+              outFile.write("--This file was auto-generated.\n")
+              outFile.write("--Modifications might be lost.\n")
+              outFile.write("-- Created : "+str(datetime.datetime.now())+".\n")
+              outFile.write("library IEEE;\n")
+              outFile.write("use IEEE.std_logic_1164.all;\n")
+              outFile.write("\n\npackage "+outFileBase+"_CTRL is\n")
+              outFile.close()
+        if self.vhdl_def:
+          if not self.outFileName:
+              self.outFileName = outFileBase + "_PKG_DEF.vhd"
+          print("generatePkg : " + str(self.outFileName))
+          with open(self.outFileName, 'w') as outFile:
+              outFile.write("--This file was auto-generated.\n")
+              outFile.write("--Modifications might be lost.\n")
+              outFile.write("-- Created : "+str(datetime.datetime.now())+".\n")
+              outFile.write("library IEEE;\n")
+              outFile.write("use IEEE.std_logic_1164.all;\n")
+              outFile.write("\n")
+              outFile.write("library ctrl_lib;\n")
+              outFile.write("use ctrl_lib."+ outFileBase + ".all;\n")
+              outFile.write("\n\npackage "+outFileBase+"_CTRL_DEF is\n")
+              outFile.close()
         ####
-        # YML
+        # YML2HDL v1
         ####
-        self.outFileName = outFileName
-        if not self.outFileName:
-            self.outFileName = outFileBase + "_PKG.vhd"
-        with open(self.outFileName.replace("PKG.vhd","TYPES.yml"), 'w') as outFile:
-            outFile.write("# This file was auto-generated.\n")
-            outFile.write("# Modifications might be lost.\n")
-            outFile.write("__config__:\n")
-            outFile.write("    basic_convert_functions : off\n")
-            outFile.write("    packages:\n")
-            outFile.write("    shared_lib:\n")
-            outFile.write("        - common_ieee_pkg\n")
-            outFile.write("\n")
-            outFile.write("HDL_Types:\n")
-            outFile.write("\n")
-            outFile.close()
+        if self.yml2hdl == 1:
+          self.outFileName = outFileName
+          if not self.outFileName:
+              self.outFileName = outFileBase + "_PKG.vhd"
+          with open(self.outFileName.replace("PKG.vhd","PKG.yml"), 'w') as outFile:
+              outFile.write("# This file was auto-generated.\n")
+              outFile.write("# Modifications might be lost.\n")
+              outFile.write("# Created : "+str(datetime.datetime.now())+".\n")
+              outFile.write("__config__:\n")
+              outFile.write("    basic_convert_functions : off\n")
+              outFile.write("    packages:\n")
+              outFile.write("    shared_lib:\n")
+              outFile.write("        - common_ieee_pkg\n")
+              outFile.write("\n")
+              outFile.write("HDL_Types:\n")
+              outFile.write("\n")
+              outFile.close()
         ####
-        # YML
+        # YML2HDL v1
+        ####
+        ####
+        # YML2HDL v2
+        ####
+        if self.yml2hdl == 2:
+          self.outFileName = outFileName
+          if not self.outFileName:
+              self.outFileName = outFileBase + "_PKG.vhd"
+          with open(self.outFileName.replace("PKG.vhd","PKG.yml"), 'w') as outFile:
+              outFile.write("# yml2hdl v2\n")
+              outFile.write("# This file was auto-generated.\n")
+              outFile.write("# Modifications might be lost.\n")
+              outFile.write("# Created : "+str(datetime.datetime.now())+".\n")
+              outFile.write("config:\n")
+              outFile.write("  basic_convert_functions : off\n")
+              outFile.write("  packages:\n")
+              outFile.write("  shared_lib:\n")
+              outFile.write("    - ieee: [std_logic_1164, numeric_std, math_real]\n")
+              outFile.write("\n")
+              outFile.write("hdl:\n")
+              outFile.write("\n")
+              outFile.close()
+        ####
+        # YML2HDL v2
         ####
         records = self.traversePkg()
-        with open(self.outFileName, 'a') as outFile:
+        if self.vhdl:
+          with open(self.outFileName, 'a') as outFile:
+            print("Closing : " + str(self.outFileName))
             outFile.write("\n\nend package "+outFileBase+"_CTRL;")
+            outFile.close()
+        if self.vhdl_def:
+          with open(self.outFileName, 'a') as outFile:
+            print("Closing : " + str(self.outFileName))
+            outFile.write("\n\nend package "+outFileBase+"_CTRL_DEF;")
             outFile.close()
         return
 
@@ -331,15 +438,15 @@ class tree(object):
 
     def traverseRegMap(self, current_node=None, padding='\t'):
         if not current_node:
-            current_node = self.root
+          current_node = self.root
         ##### expand the array entries
         expanded_child_list = []
         for child in current_node.children:
-            if child.isArray():
-                for entry in child.entries.values():
-                    expanded_child_list.append(entry)
-            else:
-                expanded_child_list.append(child)
+          if child.isArray():
+            for entry in child.entries.values():
+              expanded_child_list.append(entry)
+          else:
+            expanded_child_list.append(child)
         ##### loop over expanded list
         for child in expanded_child_list:
             if len(child.children) != 0:

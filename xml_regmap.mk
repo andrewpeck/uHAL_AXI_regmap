@@ -9,10 +9,12 @@ SYM_LNK_XMLS?= $(shell find ../src -type l)
 MAP_OBJS = $(patsubst %.xml, %_map.vhd, $(SYM_LNK_XMLS))
 PKG_OBJS = $(patsubst %.xml, %_PKG.vhd, $(SYM_LNK_XMLS))
 
+YML_OBJS = $(patsubst %.xml, %_PKG.yml, $(SYM_LNK_XMLS))
+
 .PHONY: xml_regmap clean_regmap
 
 clean_regmap:
-	@rm -rf $(MAP_OBJS) $(PKG_OBJS)
+	@rm -rf $(MAP_OBJS) $(PKG_OBJS) $(YML_OBJS)
 
 xml_regmap : $(MAP_OBJS)
 # need to extract dir name and path name here
@@ -20,6 +22,6 @@ xml_regmap : $(MAP_OBJS)
 %_map.vhd %_PKG.vhd : %.xml
 	@cd $(dir $<) &&\
 	$(XML2VHD_PATH)/generate_test_xml $(basename $(notdir $<)) &&\
-	$(XML2VHD_PATH)/build_vhdl_packages test.xml &&\
+	$(XML2VHD_PATH)/build_vhdl_packages -v test.xml &&\
 	rm test.xml
 
