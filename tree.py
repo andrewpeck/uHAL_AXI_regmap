@@ -15,7 +15,7 @@ class tree(object):
         self.default_ops = str()
         self.debug=debug
         ##### package write selection
-        self.vhdl = 0           # write vhdl types package
+        self.vhdl = 1           # write vhdl types package
         self.vhdl_def = 1       # write vhdl defaults package
         self.yml2hdl = 2        # version of yml2hdl tool type yml output 0=disable yml output
         ##### setup logger
