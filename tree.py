@@ -263,8 +263,13 @@ class tree(object):
               outFile.write("-- Created : "+str(datetime.datetime.now())+".\n")
               outFile.write("library IEEE;\n")
               outFile.write("use IEEE.std_logic_1164.all;\n")
+              outFile.write("\n")
+              # L0MDT shared common for yml2hdl v2 needed for special functions
+              outFile.write("library shared_lib;\n")
+              outFile.write("use shared_lib.common_ieee.all;\n")
               outFile.write("\n\npackage "+outFileBase+"_CTRL is\n")
               outFile.close()
+
         #### Writing vhdl defaults header
         if self.vhdl_def:
           if not self.outFileName:
@@ -320,6 +325,7 @@ class tree(object):
               outFile.write("  basic_convert_functions : off\n")
               outFile.write("  packages:\n")
               outFile.write("    - ieee: [std_logic_1164, numeric_std, math_real]\n")
+              outFile.write("    - shared_lib: [common_ieee]\n")
               outFile.write("\n")
               outFile.write("hdl:\n")
               outFile.write("\n")
