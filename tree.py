@@ -53,7 +53,7 @@ class tree(object):
                     #     outFile.write(", description: " + description[memberName])
                     outFile.write(" ]\n")
                 if current_node.isArray():
-                    array_index_string = "array: " + str(max(current_node.entries.keys()))+", type: "
+                    array_index_string = "array: " + str(1 + max(current_node.entries.keys()))+", type: "
                     #array_index_string = "array: (" + str(min(current_node.entries.keys())) + " to " + str(max(current_node.entries.keys()))+"), type : "
                     outFile.write("\n- " + baseName + "_ARRAY: [" + array_index_string + baseName + "]")
                 outFile.write("\n\n")
@@ -84,7 +84,7 @@ class tree(object):
           #     outFile.write(", description: " + description[memberName])
           outFile.write(" ]\n")
         if current_node.isArray():
-            array_index_string = "array: " + str(max(current_node.entries.keys()))+", type: "
+            array_index_string = "array: " + str(1 + max(current_node.entries.keys()))+", type: "
             #array_index_string = "array: (" + str(min(current_node.entries.keys())) + " to " + str(max(current_node.entries.keys()))+"), type : "
             outFile.write("\n- " + baseName + "_ARRAY: [" + array_index_string + baseName + "]")
         outFile.write("\n\n")
@@ -442,49 +442,90 @@ class tree(object):
         return output.getvalue()
 
     def traverseRegMap(self, current_node=None, padding='\t'):
-        if not current_node:
-          current_node = self.root
-        ##### expand the array entries
-        expanded_child_list = []
-        for child in current_node.children:
-          if child.isArray():
-            for entry in child.entries.values():
-              expanded_child_list.append(entry)
-          else:
-            expanded_child_list.append(child)
-        ##### loop over expanded list
-        for child in expanded_child_list:
-            if len(child.children) != 0:
-                self.traverseRegMap(child, padding+'\t')
+      if not current_node:
+        current_node = self.root
+      ##### expand the array entries
+      expanded_child_list = []
+      for child in current_node.children:
+        if child.isArray():
+          for entry in child.entries.values():
+            expanded_child_list.append(entry)
+        else:
+          expanded_child_list.append(child)
+      ##### loop over expanded list
+      for child in expanded_child_list:
+        if len(child.children) != 0:
+          self.traverseRegMap(child, padding+'\t')
+        else:
+          bits = child.getBitRange()
+          if child.permission == 'r':
+            read_op = "localRdData(%s) <= Mon.%s; -- %s\n" % (bits,child.getPath(includeRoot=False, expandArray=True),child.description)
+            if child.getLocalAddress() in self.read_ops:
+              self.read_ops[child.getLocalAddress()] += read_op
             else:
-                bits = child.getBitRange()
-                if child.permission == 'r':
-                    if child.getLocalAddress() in self.read_ops:
-                        self.read_ops[child.getLocalAddress()] = self.read_ops[child.getLocalAddress()] + str("localRdData("+bits+")")+" <= Mon."+child.getPath(includeRoot=False,expandArray=True)+"; --"+child.description+"\n"
-                    else:
-                        self.read_ops[child.getLocalAddress()] = str("localRdData("+bits+")")+" <= Mon."+child.getPath(includeRoot=False,expandArray=True)+"; --"+child.description+"\n"
-                elif child.permission == 'rw':
-                    if child.getLocalAddress()  in self.read_ops:
-                        self.read_ops[child.getLocalAddress()] = self.read_ops[child.getLocalAddress()] + str("localRdData("+bits+")")+" <= "+"reg_data("+str(child.getLocalAddress()).rjust(2)+")("+bits+"); --"+child.description+"\n"
-                    else:
-                        self.read_ops[child.getLocalAddress()] = str("localRdData("+bits+")")+" <= "+"reg_data("+str(child.getLocalAddress()).rjust(2)+")("+bits+"); --"+child.description+"\n"
-                    if child.getLocalAddress() in self.write_ops:
-                        self.write_ops[child.getLocalAddress()] = self.write_ops[child.getLocalAddress()] + str("reg_data("+str(child.getLocalAddress()).rjust(2)+")("+bits+")") + " <= localWrData("+bits+"); --"+child.description+"\n"
-                    else:
-                        self.write_ops[child.getLocalAddress()] = str("reg_data("+str(child.getLocalAddress()).rjust(2)+")("+bits+")") + " <= localWrData("+bits+"); --"+child.description+"\n"
-                    self.readwrite_ops+=("Ctrl."+child.getPath(includeRoot=False,expandArray=True)) + " <= reg_data("+str(child.getLocalAddress()).rjust(2)+")("+bits+");\n"
-                    self.default_ops+="reg_data("+str(child.getLocalAddress()).rjust(2)+")("+bits+") <= "+("CTRL_t."+child.getPath(includeRoot=False,expandArray=True))+";\n"
-                elif child.permission == 'w':
-                    if child.getLocalAddress() in self.write_ops:
-                        self.write_ops[child.getLocalAddress()] = self.write_ops[child.getLocalAddress()] + ("Ctrl."+child.getPath(includeRoot=False,expandArray=True)) + " <= localWrData("+bits+");\n"
-                    else:                                                     
-                        self.write_ops[child.getLocalAddress()] = ("Ctrl."+child.getPath(includeRoot=False,expandArray=True)) + " <= localWrData("+bits+");\n"
-                    #determin if this is a vector or a single entry
-                    if bits.find("downto") > 0:
-                        self.action_ops+="Ctrl." + child.getPath(includeRoot=False,expandArray=True) + " <= (others => '0');\n"
-                    else:
-                        self.action_ops+="Ctrl." + child.getPath(includeRoot=False,expandArray=True) + " <= '0';\n"
-        return
+              self.read_ops[child.getLocalAddress()] = read_op
+          elif child.permission == 'rw':
+            # read
+            read_op = "localRdData(%s) <= reg_data(%d)(%s); -- %s\n" % (bits, child.getLocalAddress(), bits, child.description)
+            if child.getLocalAddress()  in self.read_ops:
+              self.read_ops[child.getLocalAddress()] += read_op
+            else:
+              self.read_ops[child.getLocalAddress()] = read_op
+
+            # write
+            wr_op = "reg_data(%d)(%s) <= localWrData(%s); -- %s\n" % (child.getLocalAddress(),bits, bits,child.description)
+            if child.getLocalAddress() in self.write_ops:
+              self.write_ops[child.getLocalAddress()] += wr_op
+            else:
+              self.write_ops[child.getLocalAddress()] = wr_op
+
+            # read/write
+            self.readwrite_ops += "Ctrl.%s <= reg_data(%d)(%s);\n" % (child.getPath(includeRoot=False, expandArray=True),child.getLocalAddress(),bits)
+
+            # default
+            self.default_ops += "reg_data(%d)(%s) <= CTRL_t.%s;\n" % (child.getLocalAddress(),bits,child.getPath(includeRoot=False, expandArray=True))
+
+          elif child.permission == 'w':
+
+            # action_registers
+            wr_ops_str = "Ctrl.%s <= localWrData(%s);\n" % (child.getPath(includeRoot=False, expandArray=True), bits)
+            if child.getLocalAddress() in self.write_ops:
+              self.write_ops[child.getLocalAddress()] += wr_ops_str
+            else:
+              self.write_ops[child.getLocalAddress()] = wr_ops_str
+
+            # determine if this is a vector or a single entry
+            others = "(others => '0')" if bits.find("downto") > 0 else "'0'"
+            self.action_ops += "Ctrl.%s <= %s;\n" % (child.getPath(includeRoot=False, expandArray=True),others)
+
+            # bits = child.getBitRange()
+            # if child.permission == 'r':
+            #     if child.getLocalAddress() in self.read_ops:
+            #         self.read_ops[child.getLocalAddress()] = self.read_ops[child.getLocalAddress()] + str("localRdData("+bits+")")+" <= Mon."+child.getPath(includeRoot=False,expandArray=True)+"; --"+child.description+"\n"
+            #     else:
+            #         self.read_ops[child.getLocalAddress()] = str("localRdData("+bits+")")+" <= Mon."+child.getPath(includeRoot=False,expandArray=True)+"; --"+child.description+"\n"
+            # elif child.permission == 'rw':
+            #     if child.getLocalAddress()  in self.read_ops:
+            #         self.read_ops[child.getLocalAddress()] = self.read_ops[child.getLocalAddress()] + str("localRdData("+bits+")")+" <= "+"reg_data("+str(child.getLocalAddress()).rjust(2)+")("+bits+"); --"+child.description+"\n"
+            #     else:
+            #         self.read_ops[child.getLocalAddress()] = str("localRdData("+bits+")")+" <= "+"reg_data("+str(child.getLocalAddress()).rjust(2)+")("+bits+"); --"+child.description+"\n"
+            #     if child.getLocalAddress() in self.write_ops:
+            #         self.write_ops[child.getLocalAddress()] = self.write_ops[child.getLocalAddress()] + str("reg_data("+str(child.getLocalAddress()).rjust(2)+")("+bits+")") + " <= localWrData("+bits+"); --"+child.description+"\n"
+            #     else:
+            #         self.write_ops[child.getLocalAddress()] = str("reg_data("+str(child.getLocalAddress()).rjust(2)+")("+bits+")") + " <= localWrData("+bits+"); --"+child.description+"\n"
+            #     self.readwrite_ops+=("Ctrl."+child.getPath(includeRoot=False,expandArray=True)) + " <= reg_data("+str(child.getLocalAddress()).rjust(2)+")("+bits+");\n"
+            #     self.default_ops+="reg_data("+str(child.getLocalAddress()).rjust(2)+")("+bits+") <= "+("CTRL_t."+child.getPath(includeRoot=False,expandArray=True))+";\n"
+            # elif child.permission == 'w':
+            #     if child.getLocalAddress() in self.write_ops:
+            #         self.write_ops[child.getLocalAddress()] = self.write_ops[child.getLocalAddress()] + ("Ctrl."+child.getPath(includeRoot=False,expandArray=True)) + " <= localWrData("+bits+");\n"
+            #     else:                                                     
+            #         self.write_ops[child.getLocalAddress()] = ("Ctrl."+child.getPath(includeRoot=False,expandArray=True)) + " <= localWrData("+bits+");\n"
+            #     #determin if this is a vector or a single entry
+            #     if bits.find("downto") > 0:
+            #         self.action_ops+="Ctrl." + child.getPath(includeRoot=False,expandArray=True) + " <= (others => '0');\n"
+            #     else:
+            #         self.action_ops+="Ctrl." + child.getPath(includeRoot=False,expandArray=True) + " <= '0';\n"
+      return
 
     def generateRegMap(self, outFileName=None, regMapTemplate="template_map.vhd"):
         outFileBase = self.root.id
